@@ -105,6 +105,8 @@ func SendMsg(c *gin.Context) {
 	// TODO
 	// {"errcode":40058,"errmsg":"markdown.content exceed max length 4096. invalid Request Parameter, hint: [1672133087235733136500908], from ip: more info at https://open.work.weixin.qq.com/devtool/query?e=40058"}
 	// webchat 不允许超过 4096 字节,这个应该怎么样处理呢？
+	// 解决方案：企业微信的产品逻辑就是这么设计的，只能通过优化altermanager来进行合理分组，参考链接：https://github.com/feiyu563/PrometheusAlert/issues/155
+	//      https://developers.weixin.qq.com/community/develop/doc/000aaa0d358a00d12e691ad3456000
 	if len(msg) > 4096 {
 		msg = `<font color=\"warning\">err: content exceed max length 4096</font>`
 		if sentCount >= 1 {
