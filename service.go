@@ -109,6 +109,7 @@ func SendMsg(c *gin.Context) {
 		currMsg = currMsg + fmt.Sprintf(`<font color=\"%s\">%s</font>\r\n<font color=\"comment\">%s\r\n</font>`, color, v.Labels["alertname"], v.Annotations["summary"])
 
 		if len(currMsg) > 4096 {
+			part++
 			msgs = append(msgs, MsgMarkdown(oldMsg))
 			currMsg = fmt.Sprintf(`<font color=\"%s\">今日报警: %d 次, 本次报警: %d 条, Part%d</font>\r\n`, color, sentCount, len(h.Alerts), part) +
 				fmt.Sprintf(`<font color=\"%s\">%s</font>\r\n<font color=\"comment\">%s\r\n</font>`, color, v.Labels["alertname"], v.Annotations["summary"])
