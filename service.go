@@ -76,9 +76,11 @@ func GetSendCount(c *gin.Context) {
 func init() {
 	// 每日报警次数清零
 	ticker := time.NewTicker(24 * time.Hour)
-	for range ticker.C {
-		sentCount = 0
-	}
+	go func() {
+		for range ticker.C {
+			sentCount = 0
+		}
+	}()
 }
 
 // SendMsg 发送消息
