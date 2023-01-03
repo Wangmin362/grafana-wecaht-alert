@@ -74,6 +74,14 @@ func GetSendCount(c *gin.Context) {
 	return
 }
 
+func init() {
+	// 每日报警次数清零
+	ticker := time.NewTicker(24 * time.Hour)
+	for range ticker.C {
+		sentCount = 0
+	}
+}
+
 // SendMsg 发送消息
 func SendMsg(c *gin.Context) {
 	h := &Hook{}
@@ -82,12 +90,7 @@ func SendMsg(c *gin.Context) {
 		_, _ = c.Writer.WriteString("Error on JSON format")
 		return
 	}
-	// 每日报警次数清零
-	currentTime := time.Now()
-	if currentTime.Add(-time.Hour*24).Format(DateFormat) == startTime {
-		startTime = currentTime.Format(DateFormat)
-		sentCount = 0
-	}
+
 	marshal, _ := json.Marshal(h)
 	fmt.Println("接受参数数据：", string(marshal))
 	sentCount++
@@ -113,7 +116,6 @@ func SendMsg(c *gin.Context) {
 	}
 	// Send to WeChat Work
 	url := Url + c.Query("key")
-	// 处理数据格式
 	msgStr := MsgMarkdown(msg)
 
 	fmt.Println("发送的消息是：", msgStr)
