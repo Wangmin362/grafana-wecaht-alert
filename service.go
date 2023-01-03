@@ -118,9 +118,8 @@ func SendMsg(c *gin.Context) {
 
 	fmt.Println("发送的消息是：", msgStr)
 
-	jsonStr := []byte(msgStr)
 	// 发送http请求
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer(jsonStr))
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(msgStr)))
 	req.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -130,6 +129,7 @@ func SendMsg(c *gin.Context) {
 	}
 	defer resp.Body.Close()
 	body, _ := io.ReadAll(resp.Body)
+	fmt.Println("微信返回Body: ", string(body))
 	respon := Respon{}
 	if err := json.Unmarshal(body, &respon); err != nil {
 		c.Writer.WriteString(fmt.Sprintf("json unmarshal error: %s\n", string(body)))
