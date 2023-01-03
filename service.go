@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Respon struct {
+type WeChatResp struct {
 	// {"errcode":0,"errmsg":"ok"}
 	Errcode int    `json:"errcode"`
 	Errmsg  string `json:"errmsg"`
@@ -99,55 +99,60 @@ func SendMsg(c *gin.Context) {
 	if !strings.Contains(h.Title, OK) {
 		color = ColorRed
 	}
-	msg := fmt.Sprintf(`<font color=\"%s\">今日报警: %d 次, 本次报警: %d 条</font>\r\n`, color, sentCount, len(h.Alerts))
+
+	part := 1
+	msgs := make([]string, 0)
+	currMsg := fmt.Sprintf(`<font color=\"%s\">今日报警: %d 次, 本次报警: %d 条, Part%d</font>\r\n`, color, sentCount, len(h.Alerts), part)
 	// 封装报警内容, 提取 Labels 中的 alertname 和 Annotations 中的 summary
 	for _, v := range h.Alerts {
-		msg = msg + fmt.Sprintf(`<font color=\"%s\">%s</font>\r\n<font color=\"comment\">%s\r\n</font>`, color, v.Labels["alertname"], v.Annotations["summary"])
+		oldMsg := currMsg
+		currMsg = currMsg + fmt.Sprintf(`<font color=\"%s\">%s</font>\r\n<font color=\"comment\">%s\r\n</font>`, color, v.Labels["alertname"], v.Annotations["summary"])
+
+		if len(currMsg) > 4096 {
+			msgs = append(msgs, MsgMarkdown(oldMsg))
+			currMsg = fmt.Sprintf(`<font color=\"%s\">今日报警: %d 次, 本次报警: %d 条, Part%d</font>\r\n`, color, sentCount, len(h.Alerts), part) +
+				fmt.Sprintf(`<font color=\"%s\">%s</font>\r\n<font color=\"comment\">%s\r\n</font>`, color, v.Labels["alertname"], v.Annotations["summary"])
+		}
 	}
-	// TODO
 	// {"errcode":40058,"errmsg":"markdown.content exceed max length 4096. invalid Request Parameter, hint: [1672133087235733136500908], from ip: more info at https://open.work.weixin.qq.com/devtool/query?e=40058"}
 	// webchat 不允许超过 4096 字节,这个应该怎么样处理呢？
 	// 解决方案：企业微信的产品逻辑就是这么设计的，只能通过优化altermanager来进行合理分组，参考链接：https://github.com/feiyu563/PrometheusAlert/issues/155
 	//      https://developers.weixin.qq.com/community/develop/doc/000aaa0d358a00d12e691ad3456000
-	if len(msg) > 4096 {
-		msg = `<font color=\"warning\">err: content exceed max length 4096</font>`
-		if sentCount >= 1 {
-			sentCount--
-		}
-		marshal, _ := json.Marshal(h)
-		fmt.Println("接收参数数据(大于4096个字节)：", string(marshal))
-	}
-	// Send to WeChat Work
-	url := Url + c.Query("key")
-	msgStr := MsgMarkdown(msg)
-
-	fmt.Println("发送的消息是：", msgStr)
 
 	// 发送http请求
-	req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(msgStr)))
-	req.Header.Set("Content-Type", "application/json")
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		c.Writer.WriteString("Error sending to WeChat Work API") // nolint
-		return
-	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Println("微信返回Body: ", string(body))
-	respon := Respon{}
-	if err := json.Unmarshal(body, &respon); err != nil {
-		c.Writer.WriteString(fmt.Sprintf("json unmarshal error: %s\n", string(body)))
-		return
-	}
-	if respon.Errcode != 0 {
-		fmt.Println("发送的消息是：", msgStr)
-		fmt.Println("返回结果:", respon.Errmsg)
+	body := make([]byte, 0)
+	for _, msg := range msgs {
+		fmt.Println("发送的消息是：", msg)
+		body = append(body, weChatMegSend(c, msg)...)
 	}
 
 	_, _ = c.Writer.Write(body)
 
 	return
+}
+
+func weChatMegSend(c *gin.Context, msg string) []byte {
+	url := Url + c.Query("key")
+	req, _ := http.NewRequest("POST", url, bytes.NewBuffer([]byte(msg)))
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		c.Writer.WriteString("Error sending to WeChat Work API") // nolint
+		return []byte{}
+	}
+	defer resp.Body.Close()
+	currBody, _ := io.ReadAll(resp.Body)
+	chatResp := WeChatResp{}
+	if err := json.Unmarshal(currBody, &chatResp); err != nil {
+		c.Writer.WriteString(fmt.Sprintf("json unmarshal error: %s\n", string(currBody)))
+		return []byte{}
+	}
+	if chatResp.Errcode != 0 {
+		fmt.Println("发送的消息是：", msg)
+		fmt.Println("返回结果:", chatResp.Errmsg)
+	}
+	return currBody
 }
 
 // MsgMarkdown 企业微信 markdown 格式
