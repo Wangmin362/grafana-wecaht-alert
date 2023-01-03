@@ -6,4 +6,4 @@ clean:
 	rm -f grafanaWebhook
 
 copy:
-	scp ./grafanaWebhook 172.30.3.192:/tmp
+	scp -r ./grafanaWebhook 172.30.3.192:/tmp
