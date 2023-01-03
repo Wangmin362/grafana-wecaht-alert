@@ -54,7 +54,6 @@ type Alert struct {
 }
 
 var sentCount = 0
-var startTime = time.Now().Format(DateFormat)
 
 const (
 	Url         = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key="
